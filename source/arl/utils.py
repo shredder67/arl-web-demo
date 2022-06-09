@@ -22,3 +22,20 @@ def aggregate_transactions(df : pd.DataFrame):
         new_df[title][uid] = 1
     new_df = new_df.fillna(0)
     return new_df
+
+
+def hash_dataframe(df):
+    """
+    Hashes whole dataframe object
+
+    Parameters:
+        df (pandas.DataFrame) - target dataframe
+    
+    Return:
+        res_hash (int) - hashing result
+    """
+    row_hashes = pd.util.hash_pandas_object(df).to_list()
+    res_hash = 0
+    for h in row_hashes:
+        res_hash ^= h
+    return res_hash

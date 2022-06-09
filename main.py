@@ -2,10 +2,21 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-from source.arl.data_transform import aggregate_transactions
+from source.arl.utils import aggregate_transactions, hash_dataframe
 from source.arl.ARL import MyARL
 
-selected_file = None
+class DataState:
+    def __init__(self, data : pd.DataFrame, min_sup, min_conf):
+        self.data = data
+        self.min_sup = min_sup
+        self.min_conf = min_conf
+
+    def __hash__(self):
+        return hash_dataframe(self.data) ^\
+            hash(self.min_sup) ^\
+            hash(self.min_conf)
+
+            
 
 def main():
     source_data = None
@@ -48,8 +59,17 @@ def main():
 
         aggr_df = aggregate_transactions(source_data)
 
-        arl = MyARL()
-        arl.apriori(aggr_df.values, min_support=min_support, min_confidence=min_confidence, labels=aggr_df.columns)
+        arl = None
+        ds = DataState(aggr_df, min_support, min_confidence)
+        if 'ds_hash' not in st.session_state:
+            st.session_state['ds_hash'] = hash(ds)
+        elif hash(ds) == st.session_state.ds_hash:
+            arl = st.session_state.arl
+        
+        if arl is None:
+            arl = MyARL()
+            arl.apriori(aggr_df.values, min_support=min_support, min_confidence=min_confidence, labels=aggr_df.columns)
+            st.session_state['arl'] = arl
 
         arl_rules = arl.get_rules()
         arl_pop_itemssets = arl.get_popular_itemsets()
@@ -64,7 +84,7 @@ def main():
                 })
                 popular_itemsts_df.index += 1
                 
-                
+
                 'Популярные наборы:'
                 st.write(popular_itemsts_df.style.format(
                     subset=["Support"], 
