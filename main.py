@@ -21,42 +21,78 @@ def main():
         )
         
     if source_data is not None:
+
+        if type(source_data) is not pd.DataFrame:
+            source_data = pd.read_csv(source_data)
+
+        min_support = st.sidebar.slider(
+            'Минимальная поддержка:',
+            min_value=0.05,
+            max_value=1.0,
+            value=0.15
+        )
+
+        min_confidence = st.sidebar.slider(
+            'Минимальная достоверность:',
+            min_value=0.05,
+            max_value=1.0,
+            value=0.6
+        )
+
+        display_mode = st.sidebar.selectbox(
+        'Способ представления данных',
+        ['Популярные наборы', 'Правила']
+        )
+
         'Исходные данные:', source_data
 
         aggr_df = aggregate_transactions(source_data)
 
         arl = MyARL()
-        arl.apriori(aggr_df.values, min_support=0.15, min_confidence=0.6, labels=aggr_df.columns)
+        arl.apriori(aggr_df.values, min_support=min_support, min_confidence=min_confidence, labels=aggr_df.columns)
 
-        antecedents, consequents, supports, confidences, lifts = zip(*arl.get_rules())
-        itemsets, it_supports = zip(*arl.get_popular_itemsets())
+        arl_rules = arl.get_rules()
+        arl_pop_itemssets = arl.get_popular_itemsets()
 
-        rules_df = pd.DataFrame(data={
-            "Antecedent": antecedents,
-            "Consequent": consequents,
-            "Support": supports,
-            "Confidence": confidences,
-            "Lift": lifts
-        })
-        rules_df.index += 1
-        popular_itemsts_df = pd.DataFrame(data={
-        'Itemset': itemsets,
-        'Support': it_supports
-        })
-        popular_itemsts_df.index += 1
-        
+        if display_mode == 'Популярные наборы':
+            arl_pop_itemssets = arl.get_popular_itemsets()
+            if len(arl_pop_itemssets) > 0:
+                itemsets, it_supports = zip(*arl_pop_itemssets)
+                popular_itemsts_df = pd.DataFrame(data={
+                    'Itemset': [", ".join(it_set) for it_set in itemsets],
+                    'Support': it_supports
+                })
+                popular_itemsts_df.index += 1
+                
+                
+                'Популярные наборы:'
+                st.write(popular_itemsts_df.style.format(
+                    subset=["Support"], 
+                    formatter='{:.2f}'
+                ))
+            else:
+                'Для заданного параметра поддержки не было найдено популярных наборов!'
+        elif display_mode == 'Правила':
+            arl_rules = arl.get_rules()
+            if len(arl_rules) > 0:
+                antecedents, consequents, supports, confidences, lifts = zip(*arl_rules)
+                rules_df = pd.DataFrame(data={
+                    "Antecedent": [", ".join(it_set) for it_set in antecedents],
+                    "Consequent": [", ".join(it_set) for it_set in consequents],
+                    "Support": supports,
+                    "Confidence": confidences,
+                    "Lift": lifts
+                })
+                rules_df.index += 1
 
-        displayed_model = st.sidebar.selectbox(
-        'Способ представления данных',
-        ['Популярные наборы', 'Правила']
-        )
 
-        if displayed_model == 'Популярные наборы':
-            'Найденные правила:', rules_df
-        elif displayed_model == 'Правила':
-            'Найденные популярные наборы:', popular_itemsts_df
-    
-
+                'Правила:'
+                st.write(rules_df.style.format(
+                    subset=["Support", "Confidence", "Lift"],
+                    formatter='{:.2f}'
+                ))
+            else:
+                'Для заданных параметров не было найдено популярных правил!'
 
 
 if __name__ == '__main__':
