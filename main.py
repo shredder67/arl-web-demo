@@ -22,7 +22,7 @@ def main():
     source_data = None
 
     if st.sidebar.checkbox('Показать на примере'):
-        source_data = pd.read_csv('./source/data/example_input.csv')
+        source_data = pd.read_csv('./source/data/data_example.csv')
 
     if source_data is None:
         source_data = st.sidebar.file_uploader(
@@ -68,7 +68,7 @@ def main():
         
         if arl is None:
             arl = MyARL()
-            arl.apriori(aggr_df.values, min_support=min_support, min_confidence=min_confidence, labels=aggr_df.columns)
+            arl.apriori(aggr_df.values, min_support, min_confidence, labels=aggr_df.columns)
             st.session_state['arl'] = arl
 
         arl_rules = arl.get_rules()
@@ -104,7 +104,6 @@ def main():
                     "Lift": lifts
                 })
                 rules_df.index += 1
-
 
                 'Правила:'
                 st.write(rules_df.style.format(
