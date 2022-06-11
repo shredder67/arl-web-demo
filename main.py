@@ -2,8 +2,8 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-from source.arl.utils import aggregate_transactions, hash_dataframe
-from source.arl.ARL import MyARL
+from source.arl.utils import hash_dataframe, transform_df_to_item_counts
+from source.arl.ARL import MyARL, format_rules_into_df, format_pop_itemsets_into_df
 
 class DataState:
     def __init__(self, data : pd.DataFrame, min_sup, min_conf):
@@ -15,7 +15,6 @@ class DataState:
         return hash_dataframe(self.data) ^\
             hash(self.min_sup) ^\
             hash(self.min_conf)
-
             
 
 def main():
@@ -52,12 +51,12 @@ def main():
 
         display_mode = st.sidebar.selectbox(
         'Способ представления данных',
-        ['Популярные наборы', 'Правила']
+        ['Популярные наборы', 'Правила', 'Что-Если']
         )
 
-        'Исходные данные:', source_data
+        'Исходные данные:', source_data.groupby(['id']).aggregate(func=lambda vals: ', '.join(vals))
 
-        aggr_df = aggregate_transactions(source_data)
+        aggr_df = transform_df_to_item_counts(source_data)
 
         arl = None
         ds = DataState(aggr_df, min_support, min_confidence)
@@ -65,47 +64,29 @@ def main():
             st.session_state['ds_hash'] = hash(ds)
         elif hash(ds) == st.session_state.ds_hash:
             arl = st.session_state.arl
-        
+
         if arl is None:
             arl = MyARL()
             arl.apriori(aggr_df.values, min_support=min_support, min_confidence=min_confidence, labels=aggr_df.columns)
             st.session_state['arl'] = arl
 
         arl_rules = arl.get_rules()
-        arl_pop_itemssets = arl.get_popular_itemsets()
+        arl_pop_itemsets = arl.get_popular_itemsets()
 
         if display_mode == 'Популярные наборы':
-            arl_pop_itemssets = arl.get_popular_itemsets()
-            if len(arl_pop_itemssets) > 0:
-                itemsets, it_supports = zip(*arl_pop_itemssets)
-                popular_itemsts_df = pd.DataFrame(data={
-                    'Itemset': [", ".join(it_set) for it_set in itemsets],
-                    'Support': it_supports
-                })
-                popular_itemsts_df.index += 1
-                
+            if len(arl_pop_itemsets) > 0:
+                popular_itemsets_df = format_pop_itemsets_into_df(arl_pop_itemsets)
 
                 'Популярные наборы:'
-                st.write(popular_itemsts_df.style.format(
+                st.write(popular_itemsets_df.style.format(
                     subset=["Support"], 
                     formatter='{:.2f}'
                 ))
             else:
                 'Для заданного параметра поддержки не было найдено популярных наборов!'
         elif display_mode == 'Правила':
-            arl_rules = arl.get_rules()
             if len(arl_rules) > 0:
-                antecedents, consequents, supports, confidences, lifts = zip(*arl_rules)
-                rules_df = pd.DataFrame(data={
-                    "Antecedent": [", ".join(it_set) for it_set in antecedents],
-                    "Consequent": [", ".join(it_set) for it_set in consequents],
-                    "Support": supports,
-                    "Confidence": confidences,
-                    "Lift": lifts
-                })
-                rules_df.index += 1
-
-
+                rules_df = format_rules_into_df(arl_rules)
                 'Правила:'
                 st.write(rules_df.style.format(
                     subset=["Support", "Confidence", "Lift"],
@@ -113,6 +94,34 @@ def main():
                 ))
             else:
                 'Для заданных параметров не было найдено популярных правил!'
+        elif display_mode == 'Что-Если':
+            if len(arl_rules) > 0:
+                rules_df = format_rules_into_df(arl_rules)
+                
+                selected_ant = st.multiselect(
+                    'Если:',
+                    options=aggr_df.columns,
+                    default=None
+                )
+
+                conseq_df = pd.DataFrame(columns=['Consequent', 'Support', 'Confidence', 'Lift'])
+                for ant in selected_ant:
+                    for idx, rule in rules_df.iterrows():
+                        rule_ant = rule[0]
+                        if len(rule_ant) == 1 and ant == rule_ant[0]:
+                            conseq_df = conseq_df.append(
+                                rule[1:],
+                                ignore_index=True,
+                        )
+                if len(conseq_df) > 0:
+                    'Что:'
+                    st.write(conseq_df.style.format(
+                        subset=["Support", "Confidence", "Lift"],
+                        formatter='{:.2f}'
+                    ))
+                else:
+                    'Для выбранных предметов не найдены подходящие следствия!'
+            
 
 
 if __name__ == '__main__':

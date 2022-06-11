@@ -2,6 +2,7 @@ from collections import defaultdict
 from email.policy import default
 from itertools import chain, combinations
 import numpy as np
+import pandas as pd
 
 
 def powerset(iterable):
@@ -13,6 +14,27 @@ def powerset(iterable):
     """
     s = list(iterable)
     return [frozenset(ss) for ss in chain.from_iterable(combinations(s, r) for r in range(1, len(s)))]
+
+def format_rules_into_df(rules):
+    antecedents, consequents, supports, confidences, lifts = zip(*rules)
+    rules_df = pd.DataFrame(data={
+        "Antecedent": antecedents,
+        "Consequent": consequents,
+        "Support": supports,
+        "Confidence": confidences,
+        "Lift": lifts
+    })
+    rules_df.index += 1
+    return rules_df
+
+def format_pop_itemsets_into_df(pop_itemsets):
+    itemsets, it_supports = zip(*pop_itemsets)
+    popular_itemsts_df = pd.DataFrame(data={
+        'Itemset': itemsets,
+        'Support': it_supports
+    })
+    popular_itemsts_df.index += 1
+    return popular_itemsts_df
 
 
 class MyARL:
