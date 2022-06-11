@@ -131,4 +131,3 @@ class MyARL:
     
     def get_confidences(self):
         return self.rules_confidence
-

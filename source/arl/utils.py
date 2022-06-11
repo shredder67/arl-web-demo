@@ -13,7 +13,6 @@ def transform_df_to_item_counts(df : pd.DataFrame):
         new_df (pandas.DataFrame): formatted dataframe
      """
     assert len(df.columns) == 2, 'Transactions dataframe wrong format'
-
     user_ids = df.iloc[:, 0].unique().tolist()
     items = df.iloc[:, 1].unique().tolist()
     new_df = pd.DataFrame(index=user_ids, columns=items)
