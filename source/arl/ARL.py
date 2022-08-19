@@ -1,5 +1,4 @@
 from collections import defaultdict
-from email.policy import default
 from itertools import chain, combinations
 import numpy as np
 import pandas as pd

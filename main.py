@@ -24,6 +24,13 @@ def check_df_format(df: pd.DataFrame) -> bool:
 
 
 def apply_css_style(style_source: str) -> None:
+    '''
+    Applies css styles to markdown through streamlit API. May break everything, use with caution
+
+    ### Parameters:
+
+    style_source: str - path to .css file
+    '''
     with open(style_source) as f:
         st.markdown('<style>{}</style>'.format(f.read()), unsafe_allow_html=True)
 
@@ -40,53 +47,56 @@ def main() -> None:
 
     if st.sidebar.checkbox('Показать на примере'):
         source_data = './source/data/data_example.csv'
-
-    if source_data is None:
+    elif source_data is None:
         source_data = st.sidebar.file_uploader(
             'Загрузите файл csv с транзакциями',
             type='csv',
-            accept_multiple_files=False
+            accept_multiple_files=False,
+            help='Данны должны быть структурированы в две колонки, у первой название должно быть id'
         )
-        
-    if source_data is not None:
 
-        source_data = pd.read_csv(source_data)
-        source_is_correct = check_df_format(source_data)
+    if not source_data: return
 
-        if not source_is_correct:
-            st.warning('Неправильный формат загруженных данных!')
-            st.write(source_data.sample(1))
-            return
-        
-        with st.sidebar.form(key='rule_params_form'):
-            min_support = st.slider(
-                'Минимальная поддержка:',
-                min_value=0.05,
-                max_value=1.0,
-                value=0.15
-            )
-            min_confidence = st.slider(
-                'Минимальная достоверность:',
-                min_value=0.05,
-                max_value=1.0,
-                value=0.6
-            )
-            display_mode = st.selectbox(
-            'Способ представления данных',
-            ['Популярные наборы', 'Правила', 'Что-Если']
-            )
-            st.form_submit_button("Выполнить поиск")
+    source_data = pd.read_csv(source_data)
+    source_is_correct = check_df_format(source_data)
+
+    if not source_is_correct:
+        st.warning('Неправильный формат загруженных данных!')
+        st.write(source_data.sample(1))
+        return
+
+    source_col, output_col = st.columns(2, gap='large')
+    
+    with st.sidebar.form(key='rule_params_form'):
+        min_support = st.slider(
+            'Минимальная поддержка:',
+            min_value=0.05,
+            max_value=1.0,
+            value=0.15
+        )
+        min_confidence = st.slider(
+            'Минимальная достоверность:',
+            min_value=0.05,
+            max_value=1.0,
+            value=0.6
+        )
+        display_mode = st.selectbox(
+        'Способ представления данных',
+        ['Популярные наборы', 'Правила', 'Что-Если']
+        )
+        st.form_submit_button("Выполнить поиск")
+    
+    with source_col:
         'Исходные данные:', source_data.groupby(['id']).aggregate(func=lambda vals: ', '.join(vals))
 
-        aggr_df = transform_df_to_item_counts(source_data)
+    aggr_df = transform_df_to_item_counts(source_data)
 
-        arl = MyARL()
-        arl.apriori(aggr_df.values, min_support, min_confidence, labels=aggr_df.columns)
-        st.session_state['arl'] = arl
+    arl = MyARL()
+    arl.apriori(aggr_df.values, min_support, min_confidence, labels=aggr_df.columns)
 
-        arl_rules = arl.get_rules()
-        arl_pop_itemsets = arl.get_popular_itemsets()
-
+    arl_rules = arl.get_rules()
+    arl_pop_itemsets = arl.get_popular_itemsets()
+    with output_col:
         if display_mode == 'Популярные наборы':
             if len(arl_pop_itemsets) > 0:
                 popular_itemsets_df = format_pop_itemsets_into_df(arl_pop_itemsets)
