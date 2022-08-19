@@ -1,74 +1,88 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 
-from source.arl.utils import hash_dataframe, transform_df_to_item_counts
+from source.arl.utils import transform_df_to_item_counts
 from source.arl.ARL import MyARL, format_rules_into_df, format_pop_itemsets_into_df
 
-class DataState:
-    def __init__(self, data : pd.DataFrame, min_sup, min_conf):
-        self.data = data
-        self.min_sup = min_sup
-        self.min_conf = min_conf
 
-    def __hash__(self):
-        return hash_dataframe(self.data) ^\
-            hash(self.min_sup) ^\
-            hash(self.min_conf)
-            
+APPLY_CSS = False
 
-def main():
+
+def check_df_format(df: pd.DataFrame) -> bool:
+    '''
+    Checks dataframe for accordance to defined transactions format.
+
+    Format of dataframe columns should be like {id: int, : any}
+
+    ### Parameters:
+    df: pd.DataFrame - target dataframe
+
+    ### Returns:
+    isValid: bool - is dataframe correct or not
+    '''
+    return df.shape[1] == 2 and df.dtypes[0] == 'int64' and df.columns[0] == 'id'
+
+
+def apply_css_style(style_source: str) -> None:
+    with open(style_source) as f:
+        st.markdown('<style>{}</style>'.format(f.read()), unsafe_allow_html=True)
+
+
+def main() -> None:
+    '''
+    App entry point and loop, runs after every page reload/interaction
+    '''
+    if APPLY_CSS:
+        apply_css_style('source/public/style.css')
+
     source_data = None
+    source_is_correct = True
 
     if st.sidebar.checkbox('Показать на примере'):
-        source_data = pd.read_csv('./source/data/data_example.csv')
+        source_data = './source/data/data_example.csv'
 
     if source_data is None:
         source_data = st.sidebar.file_uploader(
-            'Загрузите файл с транзакциями',
+            'Загрузите файл csv с транзакциями',
             type='csv',
             accept_multiple_files=False
         )
         
     if source_data is not None:
 
-        if type(source_data) is not pd.DataFrame:
-            source_data = pd.read_csv(source_data)
+        source_data = pd.read_csv(source_data)
+        source_is_correct = check_df_format(source_data)
 
-        min_support = st.sidebar.slider(
-            'Минимальная поддержка:',
-            min_value=0.05,
-            max_value=1.0,
-            value=0.15
-        )
-
-        min_confidence = st.sidebar.slider(
-            'Минимальная достоверность:',
-            min_value=0.05,
-            max_value=1.0,
-            value=0.6
-        )
-
-        display_mode = st.sidebar.selectbox(
-        'Способ представления данных',
-        ['Популярные наборы', 'Правила', 'Что-Если']
-        )
-
+        if not source_is_correct:
+            st.warning('Неправильный формат загруженных данных!')
+            st.write(source_data.sample(1))
+            return
+        
+        with st.sidebar.form(key='rule_params_form'):
+            min_support = st.slider(
+                'Минимальная поддержка:',
+                min_value=0.05,
+                max_value=1.0,
+                value=0.15
+            )
+            min_confidence = st.slider(
+                'Минимальная достоверность:',
+                min_value=0.05,
+                max_value=1.0,
+                value=0.6
+            )
+            display_mode = st.selectbox(
+            'Способ представления данных',
+            ['Популярные наборы', 'Правила', 'Что-Если']
+            )
+            st.form_submit_button("Выполнить поиск")
         'Исходные данные:', source_data.groupby(['id']).aggregate(func=lambda vals: ', '.join(vals))
 
         aggr_df = transform_df_to_item_counts(source_data)
 
-        arl = None
-        ds = DataState(aggr_df, min_support, min_confidence)
-        if 'ds_hash' not in st.session_state:
-            st.session_state['ds_hash'] = hash(ds)
-        elif hash(ds) == st.session_state.ds_hash:
-            arl = st.session_state.arl
-
-        if arl is None:
-            arl = MyARL()
-            arl.apriori(aggr_df.values, min_support, min_confidence, labels=aggr_df.columns)
-            st.session_state['arl'] = arl
+        arl = MyARL()
+        arl.apriori(aggr_df.values, min_support, min_confidence, labels=aggr_df.columns)
+        st.session_state['arl'] = arl
 
         arl_rules = arl.get_rules()
         arl_pop_itemsets = arl.get_popular_itemsets()
@@ -122,7 +136,6 @@ def main():
                 else:
                     'Для выбранных предметов не найдены подходящие следствия!'
             
-
 
 if __name__ == '__main__':
     main()
